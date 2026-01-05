@@ -1,76 +1,544 @@
 <!doctype html>
 <html lang="he" dir="rtl">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>אורח חיים בריא</title>
-<style>
-body{font-family:system-ui,Arial;margin:0;background:#f6f7fb}
-header{background:#fff;padding:14px;border-bottom:1px solid #ddd}
-.tabs{display:flex;gap:8px;padding:10px;background:#fff}
-.tab{flex:1;padding:10px;border-radius:10px;border:1px solid #ddd}
-.tab.active{background:#111;color:#fff}
-main{padding:14px}
-.card{background:#fff;border-radius:14px;padding:14px;margin-bottom:12px}
-button{padding:10px 12px;border-radius:10px;border:1px solid #ddd}
-button.primary{background:#111;color:#fff}
-.hidden{display:none}
-.entry{border-bottom:1px dashed #eee;padding:6px 0}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>אורח חיים בריא</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Arial; }
+    body { margin: 0; background: #f6f7fb; color: #111; }
+    header { position: sticky; top: 0; background: white; border-bottom: 1px solid #e7e7ef; padding: 14px 16px; z-index: 10;}
+    header h1 { margin: 0; font-size: 18px; }
+    .tabs { display: flex; gap: 8px; padding: 10px 16px; background: white; border-bottom: 1px solid #e7e7ef; position: sticky; top: 52px; z-index: 9;}
+    .tab { padding: 10px 12px; border: 1px solid #e7e7ef; border-radius: 12px; background: #fff; cursor: pointer; font-weight: 600; }
+    .tab.active { background: #111; color: #fff; border-color: #111; }
+    main { padding: 14px 16px 28px; max-width: 760px; margin: 0 auto; }
+    .card { background: white; border: 1px solid #e7e7ef; border-radius: 16px; padding: 14px; margin-bottom: 12px; box-shadow: 0 1px 0 rgba(0,0,0,.03); }
+    .row { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+    .muted { color: #666; font-size: 12px; }
+    .btn { padding: 10px 12px; border-radius: 12px; border: 1px solid #e7e7ef; background: #fff; cursor: pointer; font-weight: 700; }
+    .btn.primary { background: #111; color: #fff; border-color: #111; }
+    .btn.danger { background: #fff; border-color: #ffdad9; color: #b00020; }
+    .btn:active { transform: translateY(1px); }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+    @media (min-width: 620px){ .grid.two { grid-template-columns: 1fr 1fr; } }
+    label { display: block; font-weight: 700; margin-bottom: 6px; }
+    input, select { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid #e7e7ef; background: #fff; font-size: 14px; }
+    .stat { display:flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px dashed #eee; }
+    .stat:last-child { border-bottom: 0; }
+    .pill { font-size: 12px; padding: 4px 8px; border-radius: 999px; border: 1px solid #e7e7ef; background: #fafafa; }
+    .entries { display: grid; gap: 10px; }
+    .entry { border: 1px solid #e7e7ef; border-radius: 14px; padding: 12px; background: #fff; }
+    .entry h3 { margin: 0 0 6px; font-size: 14px; }
+    .entry ul { margin: 6px 0 0; padding: 0 18px 0 0; }
+    .small { font-size: 12px; }
+    .right { text-align: right; }
+    .hidden { display: none !important; }
+    .divider { height: 1px; background: #eee; margin: 10px 0; }
+    footer { padding: 18px 16px; text-align: center; color:#777; font-size: 12px; }
+  </style>
 </head>
 <body>
-<header><h1>אורח חיים בריא</h1></header>
+  <header>
+    <h1>אורח חיים בריא</h1>
+    <div class="muted">MVP ב־HTML + JavaScript (נשמר במכשיר)</div>
+  </header>
 
-<div class="tabs">
-<button class="tab active" onclick="show('today')">היום</button>
-<button class="tab" onclick="show('add')">הוספה</button>
-</div>
+  <div class="tabs">
+    <button class="tab active" data-screen="today">היום</button>
+    <button class="tab" data-screen="add">הוספה</button>
+    <button class="tab" data-screen="settings">הגדרות</button>
+  </div>
 
-<main>
-<section id="today">
-<div class="card">
-<button class="primary" onclick="addWater()">מים 250</button>
-<button onclick="addProtein()">חלבון 25</button>
-</div>
-<div class="card">
-<h3>רשומות היום</h3>
-<div id="entries"></div>
-</div>
-</section>
+  <main>
+    <!-- TODAY -->
+    <section id="screen-today">
+      <div class="card">
+        <div class="row">
+          <div>
+            <div style="font-weight:800">הוספה מהירה</div>
+            <div class="muted">קליק אחד: מים / חלבון</div>
+          </div>
+          <div class="row">
+            <button class="btn primary" id="btnWater250">מים 250</button>
+            <button class="btn" id="btnProtein25">חלבון 25</button>
+          </div>
+        </div>
+      </div>
 
-<section id="add" class="hidden">
-<div class="card">
-<input id="note" placeholder="מה אכלתי / שתיתי">
-<input id="amount" type="number" placeholder="כמות">
-<button class="primary" onclick="addManual()">שמור</button>
-</div>
-</section>
-</main>
+      <div class="card">
+        <div class="row">
+          <div style="font-weight:800">סיכום היום</div>
+          <span class="pill" id="todayDatePill"></span>
+        </div>
+        <div class="divider"></div>
+        <div id="stats"></div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div style="font-weight:800">רשומות היום</div>
+          <button class="btn" id="btnClearToday">נקה יום</button>
+        </div>
+        <div class="divider"></div>
+        <div class="entries" id="entries"></div>
+        <div class="muted" id="noEntries">אין רשומות עדיין.</div>
+      </div>
+    </section>
+
+    <!-- ADD -->
+    <section id="screen-add" class="hidden">
+      <div class="card">
+        <div style="font-weight:800; margin-bottom: 10px;">הוספה ידנית</div>
+
+        <div class="grid two">
+          <div>
+            <label>כותרת</label>
+            <input id="note" placeholder="ארוחה / נשנוש / קפה..." value="ארוחה" />
+          </div>
+          <div>
+            <label>פריט</label>
+            <select id="itemSelect"></select>
+          </div>
+        </div>
+
+        <div class="grid two" style="margin-top:10px;">
+          <div>
+            <label>כמות</label>
+            <input id="qty" type="number" step="1" value="150" />
+            <div class="muted" id="qtyUnit">גרם</div>
+          </div>
+          <div>
+            <label>קיצורים</label>
+            <div class="row">
+              <button class="btn" id="btnTeaspoon" disabled>כפית (5g)</button>
+              <button class="btn" id="btnTablespoon" disabled>כף (14g)</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+        <div class="row">
+          <button class="btn primary" id="btnSaveEntry">שמור</button>
+          <button class="btn" id="btnGoToday">חזרה להיום</button>
+        </div>
+
+        <div class="muted" style="margin-top:10px;">
+          טיפ: לשומן (שמן/טחינה) לחץ כפית/כף במקום לנחש גרמים.
+        </div>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="screen-settings" class="hidden">
+      <div class="card">
+        <div style="font-weight:800; margin-bottom: 10px;">נתוני גוף</div>
+        <div class="grid two">
+          <div>
+            <label>גיל</label>
+            <input id="age" type="number" min="18" max="100" />
+          </div>
+          <div>
+            <label>גובה (ס״מ)</label>
+            <input id="height" type="number" step="0.1" />
+          </div>
+          <div>
+            <label>משקל (ק״ג)</label>
+            <input id="weight" type="number" step="0.1" />
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="font-weight:800; margin-bottom: 10px;">שעות</div>
+        <div class="grid two">
+          <div>
+            <label>שעת קימה</label>
+            <input id="wake" type="time" />
+          </div>
+          <div>
+            <label>שעת שינה</label>
+            <input id="sleep" type="time" />
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="font-weight:800; margin-bottom: 10px;">יעדים יומיים</div>
+        <div class="grid two">
+          <div>
+            <label>שתייה (מ״ל)</label>
+            <input id="tWater" type="number" step="50" />
+          </div>
+          <div>
+            <label>חלבון (g)</label>
+            <input id="tProtein" type="number" step="1" />
+          </div>
+          <div>
+            <label>פחמימה (g)</label>
+            <input id="tCarb" type="number" step="1" />
+          </div>
+          <div>
+            <label>שומן (g)</label>
+            <input id="tFat" type="number" step="1" />
+          </div>
+          <div>
+            <label>ירקות (גרם)</label>
+            <input id="tVeg" type="number" step="10" />
+          </div>
+        </div>
+
+        <div class="divider"></div>
+        <div class="row">
+          <button class="btn primary" id="btnSaveSettings">שמור</button>
+          <button class="btn danger" id="btnReset">איפוס הכל</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>© אורח חיים בריא — MVP</footer>
 
 <script>
-const KEY="ohb_web";
-let state=JSON.parse(localStorage.getItem(KEY))||{entries:[]};
-function save(){localStorage.setItem(KEY,JSON.stringify(state))}
-function render(){
-const el=document.getElementById("entries");el.innerHTML="";
-state.entries.forEach(e=>{const d=document.createElement("div");d.className="entry";d.textContent=e;el.appendChild(d)})
+/** -----------------------------
+ *  Storage + Defaults
+ *  ----------------------------- */
+const KEY = "ohb_mvp_v1";
+
+function todayKey(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,"0");
+  const day = String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
 }
-function addWater(){state.entries.push("מים 250 מ״ל");save();render()}
-function addProtein(){state.entries.push("חלבון 25 גרם");save();render()}
-function addManual(){
-const n=document.getElementById("note").value;
-const a=document.getElementById("amount").value;
-if(!n)return;
-state.entries.push(n+" "+a);save();render();show("today")
+
+function loadState() {
+  const raw = localStorage.getItem(KEY);
+  if (raw) return JSON.parse(raw);
+
+  // defaults (לפי הנתונים שנתת)
+  return {
+    profile: {
+      age: 63,
+      heightCm: 174,
+      weightKg: 83.5,
+      wake: "07:00",
+      sleep: "23:45"
+    },
+    targets: {
+      waterMl: 2400,
+      carbsG: 180,
+      proteinG: 100,
+      fatG: 65,
+      vegG: 400
+    },
+    items: [
+      { id:"water", name:"מים", category:"drink", carbsPer100:0, proteinPer100:0, fatPer100:0, kcalPer100:0 },
+      { id:"tuna", name:"טונה מסוננת", category:"protein", carbsPer100:0, proteinPer100:25, fatPer100:2, kcalPer100:120 },
+      { id:"rice", name:"אורז מבושל", category:"carb", carbsPer100:28, proteinPer100:2.7, fatPer100:0.3, kcalPer100:130 },
+      { id:"veg", name:"ירקות (כללי)", category:"veg", carbsPer100:5, proteinPer100:1.5, fatPer100:0.2, kcalPer100:30 },
+      { id:"oliveoil", name:"שמן זית", category:"fat", carbsPer100:0, proteinPer100:0, fatPer100:100, kcalPer100:884 }
+    ],
+    entriesByDay: {} // { "YYYY-MM-DD": [ {id,date,note,components:[{itemId,qty}]} ] }
+  };
 }
-function show(id){
-document.getElementById("today").classList.add("hidden");
-document.getElementById("add").classList.add("hidden");
-document.getElementById(id).classList.remove("hidden");
-document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-document.querySelectorAll(".tab")[id==="today"?0:1].classList.add("active");
+
+function saveState() {
+  localStorage.setItem(KEY, JSON.stringify(state));
 }
-render();
+
+let state = loadState();
+
+/** -----------------------------
+ *  UI Helpers
+ *  ----------------------------- */
+const $ = (sel) => document.querySelector(sel);
+
+function setActiveTab(screen) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.screen === screen));
+  $("#screen-today").classList.toggle("hidden", screen !== "today");
+  $("#screen-add").classList.toggle("hidden", screen !== "add");
+  $("#screen-settings").classList.toggle("hidden", screen !== "settings");
+}
+
+function fmtTime(d = new Date()) {
+  return d.toLocaleTimeString("he-IL", { hour: "2-digit", minute:"2-digit" });
+}
+
+function safeNum(x) {
+  const n = Number(x);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** -----------------------------
+ *  Calculations
+ *  ----------------------------- */
+function getTodayEntries() {
+  const k = todayKey();
+  return state.entriesByDay[k] || [];
+}
+
+function setTodayEntries(arr) {
+  const k = todayKey();
+  state.entriesByDay[k] = arr;
+  saveState();
+}
+
+function totalsFor(entries) {
+  const t = { carbsG:0, proteinG:0, fatG:0, vegG:0, waterMl:0, kcal:0 };
+
+  for (const e of entries) {
+    for (const c of e.components) {
+      const item = state.items.find(it => it.id === c.itemId);
+      if (!item) continue;
+      const qty = safeNum(c.qty);
+      const factor = qty / 100;
+
+      t.carbsG += safeNum(item.carbsPer100) * factor;
+      t.proteinG += safeNum(item.proteinPer100) * factor;
+      t.fatG += safeNum(item.fatPer100) * factor;
+      t.kcal += safeNum(item.kcalPer100) * factor;
+
+      if (item.category === "veg") t.vegG += qty;
+      if (item.category === "drink") t.waterMl += qty;
+    }
+  }
+  return t;
+}
+
+/** -----------------------------
+ *  Rendering
+ *  ----------------------------- */
+function renderItemSelect() {
+  const sel = $("#itemSelect");
+  sel.innerHTML = "";
+  state.items.forEach(it => {
+    const opt = document.createElement("option");
+    opt.value = it.id;
+    opt.textContent = it.name;
+    sel.appendChild(opt);
+  });
+  // ensure selection
+  if (!sel.value && state.items[0]) sel.value = state.items[0].id;
+  onItemChange();
+}
+
+function renderStats() {
+  const entries = getTodayEntries();
+  const totals = totalsFor(entries);
+  const tg = state.targets;
+
+  $("#todayDatePill").textContent = todayKey();
+
+  const rows = [
+    { title: "שתייה", val: Math.round(totals.waterMl), goal: tg.waterMl, unit: "מ״ל" },
+    { title: "חלבון", val: Math.round(totals.proteinG), goal: tg.proteinG, unit: "g" },
+    { title: "פחמימה", val: Math.round(totals.carbsG), goal: tg.carbsG, unit: "g" },
+    { title: "שומן", val: Math.round(totals.fatG), goal: tg.fatG, unit: "g" },
+    { title: "ירקות", val: Math.round(totals.vegG), goal: tg.vegG, unit: "גרם" },
+    { title: "קלוריות", val: Math.round(totals.kcal), goal: "—", unit: "kcal" }
+  ];
+
+  const stats = $("#stats");
+  stats.innerHTML = "";
+  rows.forEach(r => {
+    const div = document.createElement("div");
+    div.className = "stat";
+    div.innerHTML = `<div>${r.title}</div><div class="muted">${r.val} / ${r.goal} ${r.unit}</div>`;
+    stats.appendChild(div);
+  });
+}
+
+function renderEntries() {
+  const entries = getTodayEntries().slice().sort((a,b)=> b.createdAt - a.createdAt);
+  const wrap = $("#entries");
+  wrap.innerHTML = "";
+
+  $("#noEntries").classList.toggle("hidden", entries.length !== 0);
+
+  entries.forEach(e => {
+    const div = document.createElement("div");
+    div.className = "entry";
+    const time = new Date(e.createdAt).toLocaleTimeString("he-IL",{hour:"2-digit",minute:"2-digit"});
+    const title = (e.note && e.note.trim()) ? e.note : "רשומה";
+
+    const lis = e.components.map(c => {
+      const item = state.items.find(it => it.id === c.itemId);
+      const unit = (item?.category === "drink") ? "מ״ל" : "גרם";
+      return `<li class="small">${item?.name || "פריט"} — ${Math.round(c.qty)} ${unit}</li>`;
+    }).join("");
+
+    div.innerHTML = `
+      <div class="row">
+        <div>
+          <h3>${escapeHtml(title)}</h3>
+          <div class="muted">${time}</div>
+        </div>
+        <button class="btn danger" data-del="${e.id}">מחק</button>
+      </div>
+      <ul>${lis}</ul>
+    `;
+
+    wrap.appendChild(div);
+  });
+
+  wrap.querySelectorAll("button[data-del]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-del");
+      const now = getTodayEntries();
+      setTodayEntries(now.filter(x => x.id !== id));
+      rerenderAll();
+    });
+  });
+}
+
+function renderSettings() {
+  $("#age").value = state.profile.age;
+  $("#height").value = state.profile.heightCm;
+  $("#weight").value = state.profile.weightKg;
+  $("#wake").value = state.profile.wake;
+  $("#sleep").value = state.profile.sleep;
+
+  $("#tWater").value = state.targets.waterMl;
+  $("#tProtein").value = state.targets.proteinG;
+  $("#tCarb").value = state.targets.carbsG;
+  $("#tFat").value = state.targets.fatG;
+  $("#tVeg").value = state.targets.vegG;
+}
+
+function rerenderAll() {
+  renderStats();
+  renderEntries();
+}
+
+/** -----------------------------
+ *  Actions
+ *  ----------------------------- */
+function addEntry(note, itemId, qty, sourceNote) {
+  const entry = {
+    id: crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2),
+    createdAt: Date.now(),
+    note: note || sourceNote || "רשומה",
+    components: [{ itemId, qty: safeNum(qty) }]
+  };
+  const now = getTodayEntries();
+  now.push(entry);
+  setTodayEntries(now);
+}
+
+function quickAddWater250() {
+  const water = state.items.find(it => it.name.includes("מים")) || state.items[0];
+  if (!water) return;
+  addEntry("מים (מהיר)", water.id, 250);
+  rerenderAll();
+}
+
+function quickAddProtein25() {
+  // pick tuna if exists, else any protein item
+  let it = state.items.find(x => x.name.includes("טונה")) || state.items.find(x => x.category === "protein");
+  if (!it) return;
+  // grams needed for 25g protein
+  const proteinPer100 = safeNum(it.proteinPer100);
+  const gramsNeeded = proteinPer100 > 0 ? (25 * 100 / proteinPer100) : 100;
+  addEntry("חלבון 25g (מהיר)", it.id, gramsNeeded);
+  rerenderAll();
+}
+
+/** -----------------------------
+ *  Add screen logic
+ *  ----------------------------- */
+function onItemChange() {
+  const itemId = $("#itemSelect").value;
+  const it = state.items.find(x => x.id === itemId);
+  const isDrink = it?.category === "drink";
+  $("#qtyUnit").textContent = isDrink ? "מ״ל" : "גרם";
+
+  const isFat = it?.category === "fat";
+  $("#btnTeaspoon").disabled = !isFat;
+  $("#btnTablespoon").disabled = !isFat;
+}
+
+/** -----------------------------
+ *  Utilities
+ *  ----------------------------- */
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, s => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"
+  }[s]));
+}
+
+/** -----------------------------
+ *  Wire up events
+ *  ----------------------------- */
+document.querySelectorAll(".tab").forEach(t => {
+  t.addEventListener("click", () => setActiveTab(t.dataset.screen));
+});
+
+$("#btnWater250").addEventListener("click", quickAddWater250);
+$("#btnProtein25").addEventListener("click", quickAddProtein25);
+
+$("#btnClearToday").addEventListener("click", () => {
+  if (confirm("למחוק את כל רשומות היום?")) {
+    setTodayEntries([]);
+    rerenderAll();
+  }
+});
+
+$("#itemSelect").addEventListener("change", onItemChange);
+
+$("#btnTeaspoon").addEventListener("click", () => $("#qty").value = 5);
+$("#btnTablespoon").addEventListener("click", () => $("#qty").value = 14);
+
+$("#btnSaveEntry").addEventListener("click", () => {
+  const itemId = $("#itemSelect").value;
+  const qty = safeNum($("#qty").value);
+  const note = $("#note").value.trim();
+  if (!itemId || qty <= 0) {
+    alert("בחר פריט וכמות תקינה.");
+    return;
+  }
+  addEntry(note || "רשומה", itemId, qty);
+  $("#note").value = "ארוחה";
+  setActiveTab("today");
+  rerenderAll();
+});
+
+$("#btnGoToday").addEventListener("click", () => setActiveTab("today"));
+
+$("#btnSaveSettings").addEventListener("click", () => {
+  state.profile.age = Math.max(18, Math.min(100, parseInt($("#age").value || "63", 10)));
+  state.profile.heightCm = safeNum($("#height").value);
+  state.profile.weightKg = safeNum($("#weight").value);
+  state.profile.wake = $("#wake").value || "07:00";
+  state.profile.sleep = $("#sleep").value || "23:45";
+
+  state.targets.waterMl = safeNum($("#tWater").value);
+  state.targets.proteinG = safeNum($("#tProtein").value);
+  state.targets.carbsG = safeNum($("#tCarb").value);
+  state.targets.fatG = safeNum($("#tFat").value);
+  state.targets.vegG = safeNum($("#tVeg").value);
+
+  saveState();
+  alert("נשמר ✅");
+  rerenderAll();
+});
+
+$("#btnReset").addEventListener("click", () => {
+  if (!confirm("לאפס הכל? זה ימחק נתונים ורשומות.")) return;
+  localStorage.removeItem(KEY);
+  state = loadState();
+  renderItemSelect();
+  renderSettings();
+  rerenderAll();
+  alert("אופס… איפסנו. הכל חזר לברירת מחדל.");
+});
+
+/** -----------------------------
+ *  Init
+ *  ----------------------------- */
+renderItemSelect();
+renderSettings();
+rerenderAll();
 </script>
 </body>
 </html>
