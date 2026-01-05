@@ -31,6 +31,9 @@ function defaultState(){
       name: "",
       profile: null, // {age, gender, heightCm, weightKg, activityFactor, tdee, kcalTarget, macroTargets, waterGoalMl}
       goalMode: "maintain", // maintain | cut | bulk (future)
+      modes: { eatingOut:false },
+      favorites: [], // saved meals templates
+      weights: [] // [{dateISO, kg, ts}]
     },
     days: {
       // "YYYY-MM-DD": { foods: [...], waterMl: number, notes?: string, lastWaterTs?: number }
@@ -87,7 +90,7 @@ function defaultWaterGoalMl(weightKg){
 /* ======= Day utils ======= */
 function ensureDay(iso){
   if(!state.days[iso]){
-    state.days[iso] = { foods: [], waterMl: 0, lastWaterTs: 0 };
+    state.days[iso] = { foods: [], waterMl: 0, lastWaterTs: 0, restDay: false };
   }
   return state.days[iso];
 }
@@ -119,6 +122,10 @@ function init(){
   $("#saveProfileBtn").addEventListener("click", saveProfile);
 
   $("#addFoodBtn").addEventListener("click", ()=>openAddFoodModal(getActiveDate()));
+  $("#eatingOutBtn").addEventListener("click", toggleEatingOut);
+  $("#restDayBtn").addEventListener("click", toggleRestDay);
+  $("#weightBtn").addEventListener("click", openWeightModal);
+  $("#favoritesBtn").addEventListener("click", openFavoritesModal);
   $("#historyBtn").addEventListener("click", openHistory);
 
   $("#macroTargetsBtn").addEventListener("click", openMacroTargets);
@@ -191,6 +198,8 @@ function saveProfile(){
   state.user.profile = { ...profile, tdee, kcalTarget, macroTargets, waterGoalMl };
   saveState();
   showScreen("#screenDashboard");
+  // clear profile fields so it does not look "open"
+  ["#ageInput","#heightInput","#weightInput","#waterGoalInput"].forEach(id=>{ const el=$(id); if(el) el.value=""; });
   renderDashboard();
   toast("נשמר! יעד יומי עודכן.");
 }
@@ -218,11 +227,18 @@ function renderDashboard(){
   showScreen("#screenDashboard");
 
   const iso = getActiveDate();
-  ensureDay(iso);
+  const day = ensureDay(iso);
+  $("#todayPill").textContent = fmtDate(iso) + (day.restDay ? " • יום חופשי" : "");
 
-  $("#todayPill").textContent = fmtDate(iso);
+  // Update mode buttons
+  const eatBtn = $("#eatingOutBtn");
+  const restBtn = $("#restDayBtn");
+  if(eatBtn) eatBtn.textContent = (eatingOut ? "✅ ארוחה בחוץ" : "🍽️ ארוחה בחוץ");
+  if(restBtn) restBtn.textContent = (day.restDay ? "✅ יום חופשי" : "🛌 יום חופשי");
 
   const {kcalTarget, macroTargets, waterGoalMl} = state.user.profile;
+  const eatingOut = !!state.user.modes?.eatingOut;
+  const tol = eatingOut ? 0.15 : 0.0;
   $("#kcalLimit").textContent = round0(kcalTarget);
 
   const sums = sumDay(iso);
@@ -231,7 +247,13 @@ function renderDashboard(){
   // Calorie progress
   const pct = Math.min(200, (sums.kcal / Math.max(1,kcalTarget)) * 100);
   $("#kcalBar").style.width = pct + "%";
-  $("#kcalProgressText").textContent = `${round0(sums.kcal)} / ${round0(kcalTarget)} (${round0(Math.min(100,pct))}%)`;
+  if(tol>0){
+    const low = Math.round(kcalTarget*(1-tol));
+    const high = Math.round(kcalTarget*(1+tol));
+    $("#kcalProgressText").textContent = `${round0(sums.kcal)} / ${round0(kcalTarget)} (טווח: ${low}–${high})`;
+  } else {
+    $("#kcalProgressText").textContent = `${round0(sums.kcal)} / ${round0(kcalTarget)} (${round0(Math.min(100,pct))}%)`;
+  }
 
   // Macros
   const pPct = (sums.protein / Math.max(1, macroTargets.proteinG))*100;
@@ -254,6 +276,8 @@ function renderDashboard(){
   $("#waterProgressText").textContent = `${round0(sums.waterMl)} / ${round0(waterGoalMl)} (${round0(Math.min(100,wPct))}%)`;
 
   renderFoodsList(iso);
+  renderWeightCard();
+  renderFavoritesPreview();
   renderSmartHint(iso);
 }
 
@@ -285,10 +309,15 @@ function renderFoodsList(iso){
           <div class="kcal">${round0(f.kcal || 0)} kcal</div>
           <div class="actions">
             <button class="chip" data-action="view">צפייה</button>
+            <button class="chip" data-action="fav">⭐ שמור</button>
             <button class="chip" data-action="del">מחק</button>
           </div>
         </div>
       `;
+      item.querySelector('[data-action="fav"]').addEventListener("click", ()=>{
+        saveFoodAsFavorite(f);
+      });
+
       item.querySelector('[data-action="del"]').addEventListener("click", ()=>{
         if(confirm("למחוק את הפריט?")){
           day.foods = day.foods.filter(x=>x.id!==f.id);
@@ -407,6 +436,12 @@ function openAddFoodModal(iso){
       <div class="muted small" id="estimateStatus" style="margin-top:8px"></div>
     </div>
   `;
+
+  // Hint about eating out mode
+  if(state.user.modes?.eatingOut){
+    const st = wrap.querySelector("#estimateStatus");
+    if(st) st.textContent = "מצב ארוחה בחוץ פעיל: מותר לחרוג עד ~15% בלי לחץ.";
+  }
 
   openModal("הזנת אוכל", wrap, [
     makeBtn("ביטול", "ghost", closeModal),
@@ -672,6 +707,9 @@ function inQuietHours(){
 }
 
 function renderSmartHint(iso){
+  const day = ensureDay(iso);
+  if(day.restDay){ $("#smartHint").textContent = "יום חופשי פעיל: אין תזכורות/שיפוט ✅"; return; }
+
   const prof = state.user.profile;
   const day = ensureDay(iso);
   const goal = prof.waterGoalMl || 2000;
@@ -726,6 +764,7 @@ function tickSmartWater(){
   if(iso !== todayISO()) return; // only remind for today
 
   const day = ensureDay(iso);
+  if(day.restDay) return;
   const prof = state.user.profile;
 
   const goal = prof.waterGoalMl || 2000;
@@ -819,6 +858,7 @@ function openSettings(){
   `;
 
   openModal("הגדרות", body, [
+    makeBtn("עריכת פרופיל", "ghost", ()=>{ closeModal(); goEditProfile(); }),
     makeBtn("סגור", "ghost", closeModal),
     makeBtn("שמור", "primary", ()=>{
       prof.kcalTarget = Math.max(800, parseInt($("#setKcal").value,10)||prof.kcalTarget);
@@ -1057,6 +1097,315 @@ function toast(msg){
   toastTimer = setTimeout(()=>{
     el.style.opacity = "0";
   }, 2400);
+}
+
+
+
+/* ======= Modes: Eating Out + Rest Day ======= */
+function toggleEatingOut(){
+  state.user.modes = state.user.modes || { eatingOut:false };
+  state.user.modes.eatingOut = !state.user.modes.eatingOut;
+  saveState();
+  toast(state.user.modes.eatingOut ? "מצב ארוחה בחוץ הופעל (±15%)" : "מצב ארוחה בחוץ כובה");
+  renderDashboard();
+}
+
+function toggleRestDay(){
+  const iso = getActiveDate();
+  const day = ensureDay(iso);
+  day.restDay = !day.restDay;
+  // When rest day is on, disable smart reminders
+  saveState();
+  toast(day.restDay ? "יום חופשי הופעל ✅" : "יום חופשי כובה");
+  renderDashboard();
+}
+
+/* ======= Favorites (Meal Bank) ======= */
+function saveFoodAsFavorite(food){
+  const fav = {
+    id: crypto.randomUUID(),
+    name: food.name,
+    amount: food.amount,
+    amountUnit: food.amountUnit,
+    amountText: food.amountText,
+    kcal: food.kcal,
+    protein: food.protein || 0,
+    carbs: food.carbs || 0,
+    fat: food.fat || 0,
+    fiber: food.fiber || 0,
+    createdTs: Date.now()
+  };
+  state.user.favorites = state.user.favorites || [];
+  state.user.favorites.unshift(fav);
+  // keep up to 50
+  state.user.favorites = state.user.favorites.slice(0,50);
+  saveState();
+  toast("נשמר בבנק הארוחות ⭐");
+  renderFavoritesPreview();
+}
+
+function renderFavoritesPreview(){
+  const wrap = document.getElementById("favoritesPreview");
+  if(!wrap) return;
+  const favs = (state.user.favorites || []).slice(0,3);
+  wrap.innerHTML = "";
+  if(!favs.length){
+    wrap.innerHTML = `<div class="muted">אין עדיין ארוחות שמורות. לחץ ⭐ על פריט שאכלת.</div>`;
+    return;
+  }
+  favs.forEach(f=>{
+    const it = document.createElement("div");
+    it.className = "item";
+    const grams = f.amountUnit==="g" ? `${f.amount}g` : (f.amountText||"");
+    it.innerHTML = `
+      <div>
+        <div class="title">${escapeHtml(f.name)}</div>
+        <div class="sub">${escapeHtml(grams)} • ${round0(f.kcal||0)} kcal</div>
+      </div>
+      <div class="right">
+        <button class="chip">+ הוסף</button>
+      </div>
+    `;
+    it.querySelector("button").addEventListener("click", ()=>{
+      addFavoriteToDay(f);
+    });
+    wrap.appendChild(it);
+  });
+}
+
+function addFavoriteToDay(fav){
+  const iso = getActiveDate();
+  const day = ensureDay(iso);
+  const entry = {
+    id: crypto.randomUUID(),
+    ts: Date.now(),
+    name: fav.name,
+    amount: fav.amount,
+    amountUnit: fav.amountUnit,
+    amountText: fav.amountText,
+    kcal: fav.kcal,
+    protein: fav.protein,
+    carbs: fav.carbs,
+    fat: fav.fat,
+    fiber: fav.fiber,
+    photoDataUrl: "",
+    photoNotes: "",
+    source: "favorite"
+  };
+  day.foods.push(entry);
+  saveState();
+  renderDashboard();
+  toast("נוסף מהבנק ✅");
+}
+
+function openFavoritesModal(){
+  const favs = (state.user.favorites || []);
+  const body = document.createElement("div");
+  body.className = "grid";
+
+  const top = document.createElement("div");
+  top.className = "row gap wrap";
+  top.innerHTML = `
+    <button class="chip" id="favAddNewTip">איך שומרים?</button>
+    <button class="chip" id="favClearAll">מחיקת הכל</button>
+  `;
+  body.appendChild(top);
+
+  const list = document.createElement("div");
+  list.className = "list";
+  if(!favs.length){
+    list.innerHTML = `<div class="muted">אין ארוחות שמורות עדיין. כדי לשמור: במסך הראשי לחץ ⭐ ליד פריט שאכלת.</div>`;
+  } else {
+    favs.forEach(f=>{
+      const it = document.createElement("div");
+      it.className = "item";
+      const grams = f.amountUnit==="g" ? `${f.amount}g` : (f.amountText||"");
+      it.innerHTML = `
+        <div>
+          <div class="title">${escapeHtml(f.name)}</div>
+          <div class="sub">${escapeHtml(grams)} • ${round0(f.kcal||0)} kcal • P ${round0(f.protein||0)} • C ${round0(f.carbs||0)} • F ${round0(f.fat||0)}</div>
+        </div>
+        <div class="right">
+          <div class="actions">
+            <button class="chip" data-act="add">+ הוסף</button>
+            <button class="chip" data-act="del">מחק</button>
+          </div>
+        </div>
+      `;
+      it.querySelector('[data-act="add"]').addEventListener("click", ()=>addFavoriteToDay(f));
+      it.querySelector('[data-act="del"]').addEventListener("click", ()=>{
+        if(confirm("למחוק מהבנק?")){
+          state.user.favorites = state.user.favorites.filter(x=>x.id!==f.id);
+          saveState();
+          closeModal();
+          openFavoritesModal();
+          renderFavoritesPreview();
+        }
+      });
+      list.appendChild(it);
+    });
+  }
+  body.appendChild(list);
+
+  openModal("בנק ארוחות", body, [
+    makeBtn("סגור", "primary", closeModal)
+  ]);
+
+  const tipBtn = document.getElementById("favAddNewTip");
+  if(tipBtn) tipBtn.addEventListener("click", ()=>{
+    toast("שמור ארוחה: לחץ ⭐ ליד פריט שאכלת");
+  });
+  const clearBtn = document.getElementById("favClearAll");
+  if(clearBtn) clearBtn.addEventListener("click", ()=>{
+    if(confirm("למחוק את כל בנק הארוחות?")){
+      state.user.favorites = [];
+      saveState();
+      closeModal();
+      renderFavoritesPreview();
+      toast("נמחק ✅");
+    }
+  });
+}
+
+/* ======= Weight tracking ======= */
+function openWeightModal(){
+  const body = document.createElement("div");
+  body.className = "grid";
+  const weights = (state.user.weights || []).slice().sort((a,b)=> (b.ts||0)-(a.ts||0));
+
+  body.innerHTML = `
+    <div class="grid two">
+      <label class="field">
+        <span>תאריך (YYYY-MM-DD)</span>
+        <input id="wDate" type="text" value="${todayISO()}" inputmode="numeric" placeholder="2026-01-05">
+      </label>
+      <label class="field">
+        <span>משקל (ק״ג)</span>
+        <input id="wKg" type="number" min="30" max="300" step="0.1" inputmode="decimal" placeholder="לדוגמה: 82.5">
+      </label>
+    </div>
+    <div class="muted small">טיפ: שקילה פעם בשבוע באותה שעה/תנאים.</div>
+    <div class="sep"></div>
+    <div class="list" id="weightsList"></div>
+  `;
+
+  openModal("משקל", body, [
+    makeBtn("סגור", "ghost", closeModal),
+    makeBtn("שמור", "primary", ()=>{
+      const dateISO = (document.getElementById("wDate").value||"").trim();
+      const kg = safeNum(document.getElementById("wKg").value, 0);
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(dateISO)){ toast("תאריך לא תקין."); return; }
+      if(!kg){ toast("מלא משקל."); return; }
+      state.user.weights = state.user.weights || [];
+      // replace existing date if exists
+      state.user.weights = state.user.weights.filter(w=>w.dateISO!==dateISO);
+      state.user.weights.push({ dateISO, kg: round1(kg), ts: Date.now() });
+      saveState();
+      closeModal();
+      renderWeightCard();
+      toast("נשמר ✅");
+    })
+  ]);
+
+  const listEl = document.getElementById("weightsList");
+  if(listEl){
+    if(!weights.length){
+      listEl.innerHTML = `<div class="muted">אין עדיין שקילות.</div>`;
+    } else {
+      weights.slice(0,12).forEach(w=>{
+        const it = document.createElement("div");
+        it.className = "item";
+        it.innerHTML = `
+          <div>
+            <div class="title">${fmtDate(w.dateISO)}</div>
+            <div class="sub">${w.dateISO}</div>
+          </div>
+          <div class="right">
+            <div class="kcal">${round1(w.kg)} ק״ג</div>
+            <div class="actions">
+              <button class="chip" data-act="del">מחק</button>
+            </div>
+          </div>
+        `;
+        it.querySelector('[data-act="del"]').addEventListener("click", ()=>{
+          if(confirm("למחוק שקילה?")){
+            state.user.weights = (state.user.weights||[]).filter(x=>x.dateISO!==w.dateISO);
+            saveState();
+            closeModal();
+            openWeightModal();
+            renderWeightCard();
+          }
+        });
+        listEl.appendChild(it);
+      });
+    }
+  }
+}
+
+function renderWeightCard(){
+  const lastEl = document.getElementById("lastWeight");
+  const trendEl = document.getElementById("weightTrend");
+  const hintEl = document.getElementById("weighInHint");
+  const barEl = document.getElementById("weighInBar");
+  if(!lastEl || !trendEl || !hintEl || !barEl) return;
+
+  const weights = (state.user.weights || []).slice().sort((a,b)=> (a.dateISO > b.dateISO ? 1 : -1));
+  if(!weights.length){
+    lastEl.textContent = "—";
+    trendEl.textContent = "—";
+    hintEl.textContent = "אין שקילות";
+    barEl.style.width = "0%";
+    return;
+  }
+  const last = weights[weights.length-1];
+  lastEl.textContent = `${round1(last.kg)}`;
+
+  // Trend: compare last 28 days average to previous 28 days average
+  const now = new Date();
+  const cut = new Date(now.getTime() - 28*24*3600*1000);
+  const cut2 = new Date(now.getTime() - 56*24*3600*1000);
+
+  const wIn = (from, to) => weights.filter(w=>{
+    const d = new Date(w.dateISO+"T00:00:00");
+    return d >= from && d < to;
+  }).map(w=>w.kg);
+
+  const curr = wIn(cut, now);
+  const prev = wIn(cut2, cut);
+
+  const avg = (arr)=> arr.length ? (arr.reduce((a,b)=>a+b,0)/arr.length) : null;
+
+  const a1 = avg(curr);
+  const a0 = avg(prev);
+
+  if(a1!=null && a0!=null){
+    const diff = round1(a1 - a0);
+    trendEl.textContent = diff===0 ? "0.0" : (diff>0 ? `+${diff}` : `${diff}`);
+  } else {
+    trendEl.textContent = "—";
+  }
+
+  // Weekly consistency: how many of last 28 days have a weigh-in (max 4 expected)
+  const currDates = new Set(curr.map(()=>1));
+  const n = curr.length;
+  const pct = Math.min(100, (n/4)*100);
+  barEl.style.width = pct + "%";
+  hintEl.textContent = n>=4 ? "מעולה" : `יש ${n} שקילות ב־28 יום`;
+}
+
+/* ======= Profile editing ======= */
+function goEditProfile(){
+  showScreen("#screenProfile");
+  // Prefill
+  const p = state.user.profile;
+  if(!p) return;
+  document.getElementById("profileNamePill").textContent = state.user.name;
+  document.getElementById("ageInput").value = p.age;
+  document.getElementById("genderInput").value = p.gender;
+  document.getElementById("heightInput").value = p.heightCm;
+  document.getElementById("weightInput").value = p.weightKg;
+  document.getElementById("activityInput").value = p.activityFactor;
+  document.getElementById("waterGoalInput").value = round1((p.waterGoalMl||0)/1000);
 }
 
 document.addEventListener("DOMContentLoaded", init);

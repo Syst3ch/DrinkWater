@@ -165,9 +165,11 @@
               </div>
             </div>
 
-            <div class="row gap">
+            <div class="row gap wrap">
               <button class="primary" id="addFoodBtn">+ הזנת אוכל</button>
               <button class="ghost" id="historyBtn">יומן/היסטוריה</button>
+              <button class="chip" id="eatingOutBtn" title="מצב ארוחה בחוץ">🍽️ ארוחה בחוץ</button>
+              <button class="chip" id="restDayBtn" title="מצב שבת/חופש">🛌 יום חופשי</button>
             </div>
           </div>
 
@@ -229,7 +231,45 @@
 
             <p class="muted small" id="smartHint"></p>
           </div>
+        
+        <div class="grid two" style="margin-top:14px">
+          <div class="card">
+            <div class="row between">
+              <h2>משקל</h2>
+              <button class="chip" id="weightBtn">רישום</button>
+            </div>
+            <p class="muted small">מומלץ לשקול פעם בשבוע. נציג מגמת שינוי (Trend).</p>
+            <div class="kpis">
+              <div class="kpi">
+                <div class="kpi-label">שקילה אחרונה</div>
+                <div class="kpi-value" id="lastWeight">—</div>
+              </div>
+              <div class="kpi">
+                <div class="kpi-label">מגמה (28 ימים)</div>
+                <div class="kpi-value" id="weightTrend">—</div>
+              </div>
+            </div>
+            <div class="progress-wrap">
+              <div class="progress-head">
+                <span>עקיבות שבועית</span>
+                <span class="muted" id="weighInHint">—</span>
+              </div>
+              <div class="progress">
+                <div class="bar" id="weighInBar" style="width:0%"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="row between">
+              <h2>בנק ארוחות</h2>
+              <button class="chip" id="favoritesBtn">פתח</button>
+            </div>
+            <p class="muted small">שמור ארוחות קבועות והוסף אותן בלחיצה.</p>
+            <div id="favoritesPreview" class="list"></div>
+          </div>
         </div>
+</div>
 
         <div class="card">
           <div class="row between">
