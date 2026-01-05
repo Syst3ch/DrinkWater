@@ -197,9 +197,14 @@ function saveProfile(){
 
   state.user.profile = { ...profile, tdee, kcalTarget, macroTargets, waterGoalMl };
   saveState();
+  // close profile screen completely and go to dashboard
   showScreen("#screenDashboard");
-  // clear profile fields so it does not look "open"
+  const profScreen = document.getElementById("screenProfile");
+  if(profScreen) profScreen.hidden = true;
+
+  // clear profile inputs so it never appears filled
   ["#ageInput","#heightInput","#weightInput","#waterGoalInput"].forEach(id=>{ const el=$(id); if(el) el.value=""; });
+
   renderDashboard();
   toast("נשמר! יעד יומי עודכן.");
 }
